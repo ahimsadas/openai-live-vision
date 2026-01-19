@@ -170,7 +170,6 @@ class RealtimeClient {
             this.showStatus('Connected', true);
             this.btnConnect.classList.remove('btn-connect');
             this.btnConnect.classList.add('btn-disconnect');
-            this.btnConnect.textContent = '📵';
             
             this.addTranscript('system', 'Connected! Speak or show something to the camera.');
             
@@ -212,7 +211,6 @@ class RealtimeClient {
         this.showStatus('Disconnected', false);
         this.btnConnect.classList.remove('btn-disconnect');
         this.btnConnect.classList.add('btn-connect');
-        this.btnConnect.textContent = '📞';
     }
     
     toggleMute() {
@@ -223,7 +221,6 @@ class RealtimeClient {
             this.isMuted = !this.isMuted;
             audioTrack.enabled = !this.isMuted;
             this.btnMute.classList.toggle('muted', this.isMuted);
-            this.btnMute.textContent = this.isMuted ? '🔇' : '🎤';
         }
     }
     
@@ -235,7 +232,6 @@ class RealtimeClient {
             this.isCameraOff = !this.isCameraOff;
             videoTrack.enabled = !this.isCameraOff;
             this.btnCamera.classList.toggle('off', this.isCameraOff);
-            this.btnCamera.textContent = this.isCameraOff ? '📷' : '📷';
             
             if (this.isCameraOff) {
                 this.stopSendingFrames();
