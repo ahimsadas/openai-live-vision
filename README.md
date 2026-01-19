@@ -53,6 +53,37 @@ python main.py --interval 2.0   # Send frames every 2 seconds
 
 Type messages in the console to send text input. Type `q` to quit.
 
+## Web App
+
+A browser-based client using WebRTC for real-time audio/video streaming.
+
+### Setup
+
+```bash
+cd web
+pip install -r requirements.txt
+```
+
+### Running
+
+```bash
+python run_https.py
+```
+
+Open `https://localhost:3000` in your browser (accept the self-signed certificate warning).
+Correct port will be printed in CLI.
+
+### Features
+
+- **WebRTC audio** with echo cancellation, noise suppression, and auto gain control
+- **Camera preview** with front/back camera switching (mobile)
+- **Real-time transcription** of both user and AI speech
+- **Mute/camera toggle** controls
+
+### Why HTTPS?
+
+Browsers require HTTPS for `getUserMedia()` access to camera/microphone (except localhost on some browsers). The server generates a self-signed certificate automatically.
+
 ## Architecture
 
 ```
