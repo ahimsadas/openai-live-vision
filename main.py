@@ -77,6 +77,10 @@ MODEL = "gpt-realtime"
 DEFAULT_MODE = "camera"
 DEFAULT_FRAME_INTERVAL = 1.0
 
+# Frame capture intervals (from .env or defaults)
+IDLE_FRAME_INTERVAL = float(os.environ.get("IDLE_FRAME_INTERVAL_MS", 6000)) / 1000.0  # 6 seconds
+SPEAK_FRAME_INTERVAL = float(os.environ.get("SPEAK_FRAME_INTERVAL_MS", 500)) / 1000.0  # 0.5s = 2fps
+
 # System instructions for the AI
 SYSTEM_INSTRUCTIONS = """You are a helpful AI assistant with vision capabilities. 
 You can see what the user's camera shows and hear what they say.
@@ -103,6 +107,8 @@ class RealtimeVisionClient:
         
         self.running = True
         self.is_responding = False  # Track when AI is streaming a response
+        self.is_user_speaking = False  # Track when user is speaking (for frame rate switching)
+        self.frame_interval_event = asyncio.Event()  # Signal to update frame interval
 
     async def connect(self):
         """Connect to OpenAI Realtime API via WebSocket."""
@@ -216,12 +222,12 @@ class RealtimeVisionClient:
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = PIL.Image.fromarray(frame_rgb)
         
-        # Resize to max 1024px while maintaining aspect ratio
-        img.thumbnail([1024, 1024])
+        # Resize to max 512px while maintaining aspect ratio (reduces token usage)
+        img.thumbnail([512, 512])
         
-        # Encode as JPEG
+        # Encode as JPEG with lower quality (reduces token usage)
         image_io = io.BytesIO()
-        img.save(image_io, format="JPEG", quality=85)
+        img.save(image_io, format="JPEG", quality=70)
         image_io.seek(0)
         
         image_bytes = image_io.read()
@@ -234,15 +240,32 @@ class RealtimeVisionClient:
         # Return both raw frame (for preview) and encoded data (for API)
         return (frame, encoded_data)
 
+    def _get_current_frame_interval(self) -> float:
+        """Get current frame interval based on speaking state."""
+        if self.is_user_speaking:
+            return SPEAK_FRAME_INTERVAL
+        return IDLE_FRAME_INTERVAL
+
+    async def _interruptible_sleep(self, duration: float):
+        """Sleep that can be interrupted when frame interval changes."""
+        try:
+            # Wait for either timeout or event signal
+            await asyncio.wait_for(self.frame_interval_event.wait(), timeout=duration)
+            # Event was set - clear it and return early
+            self.frame_interval_event.clear()
+        except asyncio.TimeoutError:
+            # Normal timeout, continue
+            pass
+
     async def capture_frames(self):
-        """Continuously capture frames from webcam."""
+        """Continuously capture frames from webcam with dynamic interval switching."""
         cap = await asyncio.to_thread(cv2.VideoCapture, 0)
         
         if not cap.isOpened():
-            log_error("Could not open webcam")
+            log_error("Could not open webcam - frame sending disabled")
             return
         
-        log_success(f"Webcam opened (frames every {self.frame_interval}s)")
+        log_success(f"Webcam opened (idle: {IDLE_FRAME_INTERVAL}s, speak: {SPEAK_FRAME_INTERVAL}s)")
         log_info("Camera preview window opened. Type 'q' + Enter to quit.")
         
         try:
@@ -259,7 +282,9 @@ class RealtimeVisionClient:
                 cv2.waitKey(1)
                 
                 await self.out_queue.put(encoded_data)
-                await asyncio.sleep(self.frame_interval)
+                
+                # Use interruptible sleep with current interval
+                await self._interruptible_sleep(self._get_current_frame_interval())
         finally:
             cap.release()
             cv2.destroyAllWindows()
@@ -275,11 +300,11 @@ class RealtimeVisionClient:
             
             # Convert to PIL Image
             img = PIL.Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
-            img.thumbnail([1024, 1024])
+            img.thumbnail([512, 512])
             
-            # Encode as JPEG
+            # Encode as JPEG with lower quality (reduces token usage)
             image_io = io.BytesIO()
-            img.save(image_io, format="JPEG", quality=85)
+            img.save(image_io, format="JPEG", quality=70)
             image_io.seek(0)
             
             image_bytes = image_io.read()
@@ -293,8 +318,8 @@ class RealtimeVisionClient:
             return None
 
     async def capture_screen(self):
-        """Continuously capture screen."""
-        log_success(f"Screen capture started (frames every {self.frame_interval}s)")
+        """Continuously capture screen with dynamic interval switching."""
+        log_success(f"Screen capture started (idle: {IDLE_FRAME_INTERVAL}s, speak: {SPEAK_FRAME_INTERVAL}s)")
         
         while self.running:
             frame = await asyncio.to_thread(self._get_screen)
@@ -303,7 +328,9 @@ class RealtimeVisionClient:
                 continue
             
             await self.out_queue.put(frame)
-            await asyncio.sleep(self.frame_interval)
+            
+            # Use interruptible sleep with current interval
+            await self._interruptible_sleep(self._get_current_frame_interval())
 
     async def capture_audio(self):
         """Capture audio from microphone and send to API."""
@@ -406,6 +433,9 @@ class RealtimeVisionClient:
                         print()  # Newline to end partial response
                         self.is_responding = False
                     log_event("🎤", f"{Colors.YELLOW}Listening...{Colors.RESET}")
+                    # Switch to fast frame capture mode
+                    self.is_user_speaking = True
+                    self.frame_interval_event.set()  # Interrupt current sleep to switch immediately
                     # Clear any pending audio playback when user starts speaking (interruption)
                     while not self.audio_in_queue.empty():
                         try:
@@ -415,6 +445,9 @@ class RealtimeVisionClient:
                     
                 elif event_type == "input_audio_buffer.speech_stopped":
                     log_event("🎤", f"{Colors.DIM}Processing...{Colors.RESET}")
+                    # Switch back to idle frame capture mode
+                    self.is_user_speaking = False
+                    self.frame_interval_event.set()  # Interrupt current sleep to switch immediately
                     
                 elif event_type == "response.done":
                     response = event.get("response", {})

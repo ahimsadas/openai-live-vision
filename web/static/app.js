@@ -3,6 +3,10 @@
  * Connects to OpenAI Realtime API via WebRTC with camera and microphone
  */
 
+// Frame capture intervals (configurable)
+const IDLE_FRAME_INTERVAL_MS = 6000;   // 1 frame every 6 seconds when idle
+const SPEAK_FRAME_INTERVAL_MS = 500;   // 2 frames per second when user speaking
+
 class RealtimeClient {
     constructor() {
         this.pc = null;
@@ -16,6 +20,8 @@ class RealtimeClient {
         this.facingMode = 'user'; // 'user' = front, 'environment' = back
         this.isResponding = false;  // Track when AI is streaming a response
         this.currentTranscriptEl = null;  // Current transcript element for live updates
+        this.isUserSpeaking = false;  // Track when user is speaking (for frame rate switching)
+        this.cameraAvailable = false;  // Track camera availability
         this.availableCameras = [];
         this.currentCameraIndex = 0;
         
@@ -41,8 +47,17 @@ class RealtimeClient {
             const devices = await navigator.mediaDevices.enumerateDevices();
             this.availableCameras = devices.filter(d => d.kind === 'videoinput');
             console.log('Available cameras:', this.availableCameras.length);
+            
+            // Hide switch button if only one camera available
+            if (this.availableCameras.length <= 1) {
+                this.btnSwitch.style.display = 'none';
+            } else {
+                this.btnSwitch.style.display = '';
+            }
         } catch (e) {
             console.log('Could not enumerate cameras');
+            // Hide switch button on error
+            this.btnSwitch.style.display = 'none';
         }
     }
     
@@ -81,6 +96,9 @@ class RealtimeClient {
                     autoGainControl: true,
                 }
             });
+            
+            // Re-enumerate cameras after permission granted (iOS Safari needs this)
+            await this.enumerateCameras();
             
             // Update video mirroring based on camera
             this.updateVideoMirror();
@@ -189,6 +207,8 @@ class RealtimeClient {
         
         this.videoEl.srcObject = null;
         this.isConnected = false;
+        this.isUserSpeaking = false;  // Reset speaking state
+        this.cameraAvailable = false;  // Reset camera state
         this.showStatus('Disconnected', false);
         this.btnConnect.classList.remove('btn-disconnect');
         this.btnConnect.classList.add('btn-connect');
@@ -256,9 +276,6 @@ class RealtimeClient {
             this.updateVideoMirror();
             this.scheduleVideoAspectUpdate(newVideoTrack);
             
-            // Update button to show current camera
-            this.btnSwitch.textContent = this.facingMode === 'user' ? '🔄' : '🔁';
-            
             console.log('Switched to:', this.facingMode === 'user' ? 'front camera' : 'back camera');
         } catch (e) {
             console.error('Error switching camera:', e);
@@ -297,24 +314,59 @@ class RealtimeClient {
         }
     }
     
+    getCurrentFrameInterval() {
+        return this.isUserSpeaking ? SPEAK_FRAME_INTERVAL_MS : IDLE_FRAME_INTERVAL_MS;
+    }
+    
     startSendingFrames() {
-        if (this.frameInterval) return;
+        // Check if camera is available
+        if (!this.localStream) {
+            this.cameraAvailable = false;
+            console.log('Camera unavailable - frame sending disabled');
+            return;
+        }
         
-        // Send a frame every 1 second (matching main.py default)
+        const videoTrack = this.localStream.getVideoTracks()[0];
+        if (!videoTrack || !videoTrack.enabled) {
+            this.cameraAvailable = false;
+            console.log('Video track unavailable - frame sending disabled');
+            return;
+        }
+        
+        this.cameraAvailable = true;
+        
+        // Clear any existing interval to prevent duplicates
+        this.stopSendingFrames();
+        
+        const interval = this.getCurrentFrameInterval();
+        console.log(`Starting frame capture: ${interval}ms interval (${this.isUserSpeaking ? 'speak' : 'idle'} mode)`);
+        
         this.frameInterval = setInterval(() => {
             if (this.isConnected && !this.isCameraOff && this.dc?.readyState === 'open') {
                 this.captureAndSendFrame();
             }
-        }, 1000);
+        }, interval);
         
         // Send first frame immediately
-        setTimeout(() => this.captureAndSendFrame(), 500);
+        setTimeout(() => this.captureAndSendFrame(), 100);
     }
     
     stopSendingFrames() {
         if (this.frameInterval) {
             clearInterval(this.frameInterval);
             this.frameInterval = null;
+        }
+    }
+    
+    switchFrameMode(speaking) {
+        // Only switch if state actually changed
+        if (this.isUserSpeaking === speaking) return;
+        
+        this.isUserSpeaking = speaking;
+        
+        // Only restart if camera is available and connected
+        if (this.cameraAvailable && this.isConnected && !this.isCameraOff) {
+            this.startSendingFrames();  // This will clear old interval and start new one
         }
     }
     
@@ -332,8 +384,8 @@ class RealtimeClient {
         let width = this.videoEl.videoWidth || 640;
         let height = this.videoEl.videoHeight || 480;
         
-        // Resize to max 1024px while maintaining aspect ratio (matching main.py)
-        const maxSize = 1024;
+        // Resize to max 512px while maintaining aspect ratio (reduces token usage)
+        const maxSize = 512;
         if (width > maxSize || height > maxSize) {
             if (width > height) {
                 height = Math.round(height * (maxSize / width));
@@ -357,8 +409,8 @@ class RealtimeClient {
             ctx.drawImage(this.videoEl, 0, 0, canvas.width, canvas.height);
         }
         
-        // Convert to base64 JPEG data URL with quality 0.85 (matching main.py)
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        // Convert to base64 JPEG data URL with lower quality (reduces token usage)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.70);
         
         // Send as conversation item with image_url format
         const event = {
@@ -411,11 +463,15 @@ class RealtimeClient {
                 }
                 this.showStatus('Listening...', true);
                 console.log('🎤 Listening...');
+                // Switch to fast frame capture mode
+                this.switchFrameMode(true);
                 break;
                 
             case 'input_audio_buffer.speech_stopped':
                 this.showStatus('Processing...', true);
                 console.log('🎤 Processing...');
+                // Switch back to idle frame capture mode
+                this.switchFrameMode(false);
                 break;
                 
             case 'response.audio_transcript.delta':
