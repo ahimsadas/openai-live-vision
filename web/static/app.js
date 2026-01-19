@@ -14,6 +14,8 @@ class RealtimeClient {
         this.isCameraOff = false;
         this.frameInterval = null;
         this.facingMode = 'user'; // 'user' = front, 'environment' = back
+        this.isResponding = false;  // Track when AI is streaming a response
+        this.currentTranscriptEl = null;  // Current transcript element for live updates
         this.availableCameras = [];
         this.currentCameraIndex = 0;
         
@@ -294,12 +296,12 @@ class RealtimeClient {
     startSendingFrames() {
         if (this.frameInterval) return;
         
-        // Send a frame every 2 seconds
+        // Send a frame every 1 second (matching main.py default)
         this.frameInterval = setInterval(() => {
             if (this.isConnected && !this.isCameraOff && this.dc?.readyState === 'open') {
                 this.captureAndSendFrame();
             }
-        }, 2000);
+        }, 1000);
         
         // Send first frame immediately
         setTimeout(() => this.captureAndSendFrame(), 500);
@@ -322,9 +324,24 @@ class RealtimeClient {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Use video element dimensions
-        canvas.width = this.videoEl.videoWidth || 640;
-        canvas.height = this.videoEl.videoHeight || 480;
+        // Get original dimensions
+        let width = this.videoEl.videoWidth || 640;
+        let height = this.videoEl.videoHeight || 480;
+        
+        // Resize to max 1024px while maintaining aspect ratio (matching main.py)
+        const maxSize = 1024;
+        if (width > maxSize || height > maxSize) {
+            if (width > height) {
+                height = Math.round(height * (maxSize / width));
+                width = maxSize;
+            } else {
+                width = Math.round(width * (maxSize / height));
+                height = maxSize;
+            }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
         
         // Draw current frame (flip horizontally only for front camera)
         if (this.facingMode === 'user') {
@@ -336,8 +353,8 @@ class RealtimeClient {
             ctx.drawImage(this.videoEl, 0, 0, canvas.width, canvas.height);
         }
         
-        // Convert to base64 JPEG data URL
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        // Convert to base64 JPEG data URL with quality 0.85 (matching main.py)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
         
         // Send as conversation item with image_url format
         const event = {
@@ -372,6 +389,7 @@ class RealtimeClient {
                 
             case 'session.updated':
                 console.log('Session updated');
+                this.addTranscript('system', 'Session updated');
                 break;
                 
             case 'conversation.item.input_audio_transcription.completed':
@@ -380,14 +398,41 @@ class RealtimeClient {
                 }
                 break;
                 
+            case 'input_audio_buffer.speech_started':
+                // Interruption: user started speaking
+                if (this.isResponding) {
+                    // End current response cleanly
+                    this.finishCurrentTranscript();
+                    this.isResponding = false;
+                }
+                this.showStatus('Listening...', true);
+                console.log('🎤 Listening...');
+                break;
+                
+            case 'input_audio_buffer.speech_stopped':
+                this.showStatus('Processing...', true);
+                console.log('🎤 Processing...');
+                break;
+                
             case 'response.audio_transcript.delta':
-                // Real-time transcript of AI response
+            case 'response.output_audio_transcript.delta':
+                // Real-time transcript of AI response - show live as it streams
+                this.isResponding = true;
+                if (event.delta) {
+                    this.appendToCurrentTranscript(event.delta);
+                }
                 break;
                 
             case 'response.audio_transcript.done':
-                if (event.transcript) {
-                    this.addTranscript('assistant', event.transcript);
-                }
+            case 'response.output_audio_transcript.done':
+                this.isResponding = false;
+                this.finishCurrentTranscript();
+                this.showStatus('Connected', true);
+                break;
+                
+            case 'response.audio.done':
+            case 'response.output_audio.done':
+                this.isResponding = false;
                 break;
                 
             case 'response.text.done':
@@ -396,11 +441,45 @@ class RealtimeClient {
                 }
                 break;
                 
+            case 'response.done':
+                // Check for errors in response
+                const response = event.response;
+                if (response?.status === 'failed') {
+                    const error = response.status_details?.error;
+                    console.error('Response failed:', error);
+                    this.showError(error?.message || 'Response failed');
+                }
+                this.isResponding = false;
+                break;
+                
             case 'error':
                 console.error('API Error:', event.error);
                 this.showError(event.error?.message || 'Unknown error');
                 break;
         }
+    }
+    
+    appendToCurrentTranscript(delta) {
+        // Create or append to current transcript element for live streaming
+        if (!this.currentTranscriptEl) {
+            this.currentTranscriptEl = document.createElement('div');
+            this.currentTranscriptEl.className = 'transcript-item assistant';
+            this.currentTranscriptEl.textContent = '🤖 AI: ';
+            
+            // Remove placeholder if exists
+            const placeholder = this.transcriptContent.querySelector('[style]');
+            if (placeholder) placeholder.remove();
+            
+            this.transcriptContent.appendChild(this.currentTranscriptEl);
+        }
+        
+        this.currentTranscriptEl.textContent += delta;
+        this.transcriptContent.scrollTop = this.transcriptContent.scrollHeight;
+    }
+    
+    finishCurrentTranscript() {
+        // Finalize the current streaming transcript
+        this.currentTranscriptEl = null;
     }
     
     showStatus(text, connected) {

@@ -41,6 +41,10 @@ def generate_self_signed_cert():
 def main():
     import socket
     
+    # Change to the web directory (where server.py and static/ are located)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(script_dir)
+    
     # Get local IP
     hostname = socket.gethostname()
     try:

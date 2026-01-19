@@ -27,28 +27,7 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 SESSION_CONFIG = {
     "type": "realtime",
-    "model": "gpt-realtime",
-    "instructions": """You are a helpful AI assistant with vision capabilities.
-You can see what the user's camera shows and hear what they say.
-- Be concise and natural in your responses
-- Describe what you see when relevant
-- Respond conversationally to audio input
-- If you see something interesting, mention it proactively""",
-    "audio": {
-        "input": {
-            "format": {
-                "type": "audio/pcm",
-                "rate": 24000
-            }
-        },
-        "output": {
-            "format": {
-                "type": "audio/pcm",
-                "rate": 24000
-            },
-            "voice": "coral"
-        }
-    }
+    "model": "gpt-realtime"
 }
 
 
@@ -74,6 +53,7 @@ async def get_token():
             )
             
             if response.status_code != 200:
+                print(f"Token API error: {response.status_code} - {response.text}")
                 return JSONResponse(
                     status_code=response.status_code,
                     content={"error": response.text}
