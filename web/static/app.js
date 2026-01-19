@@ -75,7 +75,11 @@ class RealtimeClient {
             // Get user media (camera + microphone)
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: this.facingMode, width: { ideal: 640 }, height: { ideal: 480 } },
-                audio: true
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                }
             });
             
             // Update video mirroring based on camera
