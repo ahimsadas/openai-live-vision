@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OpenAI Realtime Vision</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #8b8b9a;
+            font-size: 0.9rem;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: var(--video-aspect, 4 / 3);
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            margin: 20px 0;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        #localVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        .video-overlay {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .status-badge {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ff4444;
+        }
+
+        .status-dot.connected {
+            background: #44ff44;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            padding: 20px 0;
+        }
+
+        .btn {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            font-size: 1.5rem;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn-connect {
+            background: linear-gradient(135deg, #00c853 0%, #00a843 100%);
+            box-shadow: 0 4px 20px rgba(0, 200, 83, 0.4);
+        }
+
+        .btn-connect:hover {
+            box-shadow: 0 6px 25px rgba(0, 200, 83, 0.5);
+        }
+
+        .btn-disconnect {
+            background: linear-gradient(135deg, #ff4444 0%, #cc3333 100%);
+            box-shadow: 0 4px 20px rgba(255, 68, 68, 0.4);
+        }
+
+        .btn-mute {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-mute.muted {
+            background: rgba(255, 68, 68, 0.2);
+            border-color: #ff4444;
+        }
+
+        .btn-camera {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-camera.off {
+            background: rgba(255, 68, 68, 0.2);
+            border-color: #ff4444;
+        }
+
+        .btn-switch {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-switch:active {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .transcript {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .transcript-title {
+            font-size: 0.8rem;
+            color: #8b8b9a;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .transcript-content {
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .transcript-item {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .transcript-item:last-child {
+            border-bottom: none;
+        }
+
+        .transcript-item.user {
+            color: #64b5f6;
+        }
+
+        .transcript-item.assistant {
+            color: #81c784;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: rgba(255, 68, 68, 0.1);
+            border: 1px solid rgba(255, 68, 68, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 16px;
+            font-size: 0.9rem;
+            color: #ff8888;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 12px;
+            }
+
+            h1 {
+                font-size: 1.2rem;
+            }
+
+            .btn {
+                width: 56px;
+                height: 56px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎥 OpenAI Realtime Vision</h1>
+            <p class="subtitle">Speak and show - AI sees and responds</p>
+        </header>
+
+        <div class="video-container">
+            <video id="localVideo" autoplay playsinline muted></video>
+            <div class="video-overlay">
+                <div class="status-badge">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Disconnected</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-mute" id="btnMute" title="Mute/Unmute">
+                🎤
+            </button>
+            <button class="btn btn-connect" id="btnConnect" title="Connect">
+                📞
+            </button>
+            <button class="btn btn-camera" id="btnCamera" title="Camera On/Off">
+                📷
+            </button>
+            <button class="btn btn-switch" id="btnSwitch" title="Switch Camera">
+                🔄
+            </button>
+        </div>
+
+        <div id="errorContainer" class="error-message hidden"></div>
+
+        <div class="transcript">
+            <div class="transcript-title">Conversation</div>
+            <div class="transcript-content" id="transcriptContent">
+                <div class="transcript-item" style="color: #8b8b9a;">
+                    Tap the call button to start...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
