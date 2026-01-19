@@ -1,12 +1,12 @@
-# OpenAI Realtime Vision + Audio MVP
+# OpenAI Realtime Vision MVP
 
-A Python application that captures webcam video and microphone audio, sends them to OpenAI's Realtime API, and plays back audio responses.
+A Python application that captures webcam video and microphone audio, sends them to OpenAI's Realtime API, and plays back the AI's audio responses.
 
 ## Features
 
 - **Webcam capture**: Sends frames at configurable intervals (default: 1 second)
-- **Microphone input**: Continuous audio streaming to the model
-- **Audio output**: Plays model's spoken responses through speakers
+- **Microphone input**: Streams audio to the API in real-time
+- **Audio playback**: Plays AI responses through your speakers
 - **Async architecture**: Non-blocking I/O using asyncio
 
 ## Requirements
@@ -15,103 +15,55 @@ A Python application that captures webcam video and microphone audio, sends them
 - OpenAI API key with Realtime API access
 - Webcam
 - Microphone
-- Speakers/headphones
+- Speakers/Headphones
 
-## Installation
+## Setup
 
-1. Create and activate a virtual environment:
-```bash
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+1. Create and activate virtual environment:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
 
 2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-3. Create a `.env` file with your OpenAI API key:
-```bash
-OPENAI_API_KEY=your_api_key_here
-```
+3. Create `.env` file with your API key:
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your OPENAI_API_KEY
+   ```
 
 ## Usage
 
-Run the main application:
+Run the application:
 ```bash
 python main.py
 ```
 
-### Command Line Options
-
-- `--mode`: Input mode - `camera`, `screen`, or `none` (default: `camera`)
-- `--interval`: Frame capture interval in seconds (default: `1.0`)
-
-Examples:
+Options:
 ```bash
-# Camera mode with 2-second frame intervals
-python main.py --mode camera --interval 2.0
-
-# Screen capture mode
-python main.py --mode screen
-
-# Audio-only mode (no video)
-python main.py --mode none
+python main.py --mode camera    # Webcam mode (default)
+python main.py --mode screen    # Screen capture mode
+python main.py --mode none      # Audio only, no video
+python main.py --interval 2.0   # Send frames every 2 seconds
 ```
 
-### Controls
-
-- Type text messages and press Enter to send
-- Type `q` and press Enter to quit
+Type messages in the console to send text input. Type `q` to quit.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                   Python Application                     │
-│  ┌──────────┐  ┌──────────┐  ┌────────────────────┐    │
-│  │  Webcam  │  │   Mic    │  │  Audio Playback    │    │
-│  │ (OpenCV) │  │(PyAudio) │  │    (PyAudio)       │    │
-│  └────┬─────┘  └────┬─────┘  └─────────▲──────────┘    │
-│       │             │                   │               │
-│       ▼             ▼                   │               │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │           Async Event Loop (asyncio)              │  │
-│  └────────────────────┬─────────────────────────────┘  │
-└───────────────────────┼─────────────────────────────────┘
-                        │ WebSocket
-                        ▼
-             ┌─────────────────────┐
-             │  OpenAI Realtime    │
-             │  API (gpt-4o)       │
-             └─────────────────────┘
+Webcam → Frame Queue → 
+                        → Output Queue → WebSocket → OpenAI Realtime API
+Microphone → Audio Queue →                              ↓
+                                              Audio Response Queue → Speaker
 ```
 
-## Troubleshooting
+## Notes
 
-### PyAudio Installation Issues
-
-**macOS:**
-```bash
-brew install portaudio
-pip install pyaudio
-```
-
-**Ubuntu/Debian:**
-```bash
-sudo apt-get install portaudio19-dev
-pip install pyaudio
-```
-
-**Windows:**
-```bash
-pip install pyaudio
-```
-
-### Camera Access
-
-Ensure your terminal/IDE has camera access permissions in System Preferences (macOS) or equivalent.
-
-## License
-
-MIT
+- The Realtime API uses PCM audio at 24kHz sample rate
+- Images are resized to max 1024px and sent as base64 JPEG
+- Uses semantic VAD for turn detection
