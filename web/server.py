@@ -12,6 +12,7 @@ import httpx
 from dotenv import load_dotenv
 
 load_dotenv(dotenv_path="../.env")
+load_dotenv()  # Also check current directory
 
 app = FastAPI()
 
@@ -24,10 +25,11 @@ app.add_middleware(
 )
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+MODEL = os.environ.get("OPENAI_MODEL", "gpt-realtime")
 
 SESSION_CONFIG = {
     "type": "realtime",
-    "model": "gpt-realtime"
+    "model": MODEL
 }
 
 
@@ -113,7 +115,8 @@ async def create_session(request: Request):
 
 
 # Serve static files
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
 
 if __name__ == "__main__":

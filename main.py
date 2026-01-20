@@ -72,7 +72,7 @@ CHUNK_SIZE = 1024
 
 # OpenAI Realtime API endpoint
 REALTIME_API_URL = "wss://api.openai.com/v1/realtime"
-MODEL = "gpt-realtime"
+MODEL = os.environ.get("OPENAI_MODEL", "gpt-realtime")
 
 DEFAULT_MODE = "camera"
 DEFAULT_FRAME_INTERVAL = 1.0
@@ -80,6 +80,11 @@ DEFAULT_FRAME_INTERVAL = 1.0
 # Frame capture intervals (from .env or defaults)
 IDLE_FRAME_INTERVAL = float(os.environ.get("IDLE_FRAME_INTERVAL_MS", 6000)) / 1000.0  # 6 seconds
 SPEAK_FRAME_INTERVAL = float(os.environ.get("SPEAK_FRAME_INTERVAL_MS", 500)) / 1000.0  # 0.5s = 2fps
+
+# Server-side VAD settings (from .env or defaults)
+VAD_THRESHOLD = float(os.environ.get("OPENAI_SERVER_SIDE_VAD_THRESHOLD", 0.5))
+VAD_PREFIX_PADDING_MS = int(os.environ.get("OPENAI_SERVER_SIDE_VAD_PREFIX_PADDING_MS", 500))
+VAD_SILENCE_DURATION_MS = int(os.environ.get("OPENAI_SERVER_SIDE_VAD_SILENCE_DURATION_MS", 500))
 
 # System instructions for the AI
 SYSTEM_INSTRUCTIONS = """You are a helpful AI assistant with vision capabilities. 
@@ -151,9 +156,9 @@ class RealtimeVisionClient:
                 },
                 "turn_detection": {
                     "type": "server_vad",
-                    "threshold": 0.5,
-                    "prefix_padding_ms": 500,
-                    "silence_duration_ms": 500
+                    "threshold": VAD_THRESHOLD,
+                    "prefix_padding_ms": VAD_PREFIX_PADDING_MS,
+                    "silence_duration_ms": VAD_SILENCE_DURATION_MS
                 }
             }
         }

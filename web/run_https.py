@@ -63,6 +63,14 @@ def main():
     
     generate_self_signed_cert()
     
+    # Load config values from server module for display
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path="../.env")
+    load_dotenv()
+    
+    model = os.environ.get("OPENAI_MODEL", "gpt-realtime")
+    api_key_set = bool(os.environ.get("OPENAI_API_KEY"))
+    
     print("\n" + "="*60)
     print("OpenAI Realtime Vision Web Server (HTTPS)")
     print("="*60)
@@ -70,6 +78,11 @@ def main():
     print(f"Access from iPhone/mobile: https://{local_ip}:3000")
     print("\n⚠️  On iPhone, you'll see a security warning.")
     print("   Tap 'Advanced' > 'Proceed to site' to continue.")
+    print("\n" + "-"*60)
+    print("Configuration:")
+    print("-"*60)
+    print(f"  Model:              {model}")
+    print(f"  API Key:            {'configured' if api_key_set else 'NOT SET'}")
     print("="*60 + "\n")
     
     # Run uvicorn with SSL

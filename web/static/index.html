@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tutora Realtime Vision</title>
+    <title>Tutora - Vision</title>
     <style>
         * {
             margin: 0;
@@ -161,6 +161,31 @@
             background: rgba(255, 255, 255, 0.2);
         }
 
+        .btn-debug {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-debug.active {
+            background: rgba(255, 165, 0, 0.3);
+            border-color: #ffa500;
+        }
+
+        #debugCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+            z-index: 1;
+        }
+
+        #debugCanvas.visible {
+            display: block;
+        }
+
         .transcript {
             background: rgba(255, 255, 255, 0.05);
             border-radius: 12px;
@@ -253,12 +278,13 @@
 <body>
     <div class="container">
         <header>
-            <h1>Tutora Realtime Vision</h1>
+            <h1>Tutora - Vision</h1>
             <p class="subtitle">Powered by OpenAI Realtime API</p>
         </header>
 
         <div class="video-container">
             <video id="localVideo" autoplay playsinline muted></video>
+            <canvas id="debugCanvas"></canvas>
             <div class="video-overlay">
                 <div class="status-badge">
                     <div class="status-dot" id="statusDot"></div>
@@ -277,8 +303,11 @@
             <button class="btn btn-mute" id="btnMute" title="Mute/Unmute">
                 🎤
             </button>
-            <button class="btn btn-switch" id="btnSwitch" title="Switch Camera">
+            <button class="btn btn-switch" id="btnSwitch" title="Switch Camera" style="display: none;">
                 🔄
+            </button>
+            <button class="btn btn-debug" id="btnDebug" title="Debug Mode">
+                🛠️
             </button>
         </div>
 

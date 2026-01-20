@@ -24,6 +24,7 @@ class RealtimeClient {
         this.cameraAvailable = false;  // Track camera availability
         this.availableCameras = [];
         this.currentCameraIndex = 0;
+        this.debugMode = false;  // Debug mode to show captured frames
         
         // DOM elements
         this.videoEl = document.getElementById('localVideo');
@@ -32,6 +33,8 @@ class RealtimeClient {
         this.btnMute = document.getElementById('btnMute');
         this.btnCamera = document.getElementById('btnCamera');
         this.btnSwitch = document.getElementById('btnSwitch');
+        this.btnDebug = document.getElementById('btnDebug');
+        this.debugCanvas = document.getElementById('debugCanvas');
         this.statusDot = document.getElementById('statusDot');
         this.statusText = document.getElementById('statusText');
         this.transcriptContent = document.getElementById('transcriptContent');
@@ -42,17 +45,22 @@ class RealtimeClient {
         this.enumerateCameras();
     }
     
+    isMobileDevice() {
+        return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    }
+    
     async enumerateCameras() {
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
             this.availableCameras = devices.filter(d => d.kind === 'videoinput');
-            console.log('Available cameras:', this.availableCameras.length);
+            console.log('Available cameras:', this.availableCameras.length, 'Mobile:', this.isMobileDevice());
             
-            // Hide switch button if only one camera available
-            if (this.availableCameras.length <= 1) {
-                this.btnSwitch.style.display = 'none';
-            } else {
+            // Only show switch button on mobile devices with 2+ cameras
+            // facingMode (front/back) switching is only meaningful on mobile
+            if (this.isMobileDevice() && this.availableCameras.length >= 2) {
                 this.btnSwitch.style.display = '';
+            } else {
+                this.btnSwitch.style.display = 'none';
             }
         } catch (e) {
             console.log('Could not enumerate cameras');
@@ -66,6 +74,14 @@ class RealtimeClient {
         this.btnMute.addEventListener('click', () => this.toggleMute());
         this.btnCamera.addEventListener('click', () => this.toggleCamera());
         this.btnSwitch.addEventListener('click', () => this.switchCamera());
+        this.btnDebug.addEventListener('click', () => this.toggleDebug());
+    }
+    
+    toggleDebug() {
+        this.debugMode = !this.debugMode;
+        this.btnDebug.classList.toggle('active', this.debugMode);
+        this.debugCanvas.classList.toggle('visible', this.debugMode);
+        console.log('Debug mode:', this.debugMode ? 'ON' : 'OFF');
     }
 
     setupVideoAspectListeners() {
@@ -281,12 +297,8 @@ class RealtimeClient {
     }
     
     updateVideoMirror() {
-        // Mirror front camera, don't mirror back camera
-        if (this.facingMode === 'user') {
-            this.videoEl.style.transform = 'scaleX(-1)';
-        } else {
-            this.videoEl.style.transform = 'scaleX(1)';
-        }
+        // No mirroring - show camera as-is
+        this.videoEl.style.transform = 'scaleX(1)';
     }
 
     scheduleVideoAspectUpdate(videoTrack = this.localStream?.getVideoTracks?.()[0]) {
@@ -395,15 +407,8 @@ class RealtimeClient {
         canvas.width = width;
         canvas.height = height;
         
-        // Draw current frame (flip horizontally only for front camera)
-        if (this.facingMode === 'user') {
-            ctx.save();
-            ctx.scale(-1, 1);
-            ctx.drawImage(this.videoEl, -canvas.width, 0, canvas.width, canvas.height);
-            ctx.restore();
-        } else {
-            ctx.drawImage(this.videoEl, 0, 0, canvas.width, canvas.height);
-        }
+        // Draw current frame (no flip)
+        ctx.drawImage(this.videoEl, 0, 0, canvas.width, canvas.height);
         
         // Convert to base64 JPEG data URL with lower quality (reduces token usage)
         const dataUrl = canvas.toDataURL('image/jpeg', 0.70);
@@ -422,6 +427,14 @@ class RealtimeClient {
                 ]
             }
         };
+        
+        // If debug mode is on, draw the captured frame to the debug canvas
+        if (this.debugMode) {
+            this.debugCanvas.width = canvas.width;
+            this.debugCanvas.height = canvas.height;
+            const debugCtx = this.debugCanvas.getContext('2d');
+            debugCtx.drawImage(canvas, 0, 0);
+        }
         
         try {
             this.dc.send(JSON.stringify(event));
@@ -526,11 +539,11 @@ class RealtimeClient {
             const placeholder = this.transcriptContent.querySelector('[style]');
             if (placeholder) placeholder.remove();
             
-            this.transcriptContent.appendChild(this.currentTranscriptEl);
+            // Prepend at top so latest is always visible
+            this.transcriptContent.prepend(this.currentTranscriptEl);
         }
         
         this.currentTranscriptEl.textContent += delta;
-        this.transcriptContent.scrollTop = this.transcriptContent.scrollHeight;
     }
     
     finishCurrentTranscript() {
@@ -564,12 +577,13 @@ class RealtimeClient {
         const placeholder = this.transcriptContent.querySelector('[style]');
         if (placeholder) placeholder.remove();
         
-        this.transcriptContent.appendChild(item);
-        this.transcriptContent.scrollTop = this.transcriptContent.scrollHeight;
+        // Prepend at top so latest is always visible
+        this.transcriptContent.prepend(item);
     }
 }
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('OpenAI Realtime Vision v2 - Debug mode available');
     window.realtimeClient = new RealtimeClient();
 });
