@@ -26,6 +26,7 @@ app.add_middleware(
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 MODEL = os.environ.get("OPENAI_MODEL", "gpt-realtime")
+VOICE = os.environ.get("OPENAI_VOICE", "alloy")
 
 SYSTEM_INSTRUCTIONS = """You are Tutora, a helpful AI tutor with vision capabilities.
 You can see what the user's camera shows and hear what they say.
@@ -37,6 +38,7 @@ ALWAYS respond ONLY to what you see in the LATEST image frame provided to you.
 SESSION_CONFIG = {
     "type": "realtime",
     "model": MODEL,
+    "voice": VOICE,
     "instructions": SYSTEM_INSTRUCTIONS
 }
 
