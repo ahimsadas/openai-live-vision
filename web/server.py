@@ -6,7 +6,7 @@ Serves the web frontend and handles token requests.
 import os
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 from dotenv import load_dotenv
@@ -27,9 +27,9 @@ app.add_middleware(
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 MODEL = os.environ.get("OPENAI_MODEL", "gpt-realtime")
 
-SYSTEM_INSTRUCTIONS = """You are a helpful AI assistant with vision capabilities.
+SYSTEM_INSTRUCTIONS = """You are Tutora, a helpful AI tutor with vision capabilities.
 You can see what the user's camera shows and hear what they say.
-ALWAYS respond ONLY to what you see in the LATEST image provided to you.
+ALWAYS respond ONLY to what you see in the LATEST image frame provided to you.
 - Be concise and natural in your responses
 - Respond conversationally to audio input
 - DO NOT repeat things (unless explicitly asked by the user)"""
@@ -90,7 +90,6 @@ async def create_session(request: Request):
     
     async with httpx.AsyncClient() as client:
         try:
-            from httpx import Response
             import json
             
             # Create multipart form data
