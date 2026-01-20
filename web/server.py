@@ -27,9 +27,17 @@ app.add_middleware(
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 MODEL = os.environ.get("OPENAI_MODEL", "gpt-realtime")
 
+SYSTEM_INSTRUCTIONS = """You are a helpful AI assistant with vision capabilities.
+You can see what the user's camera shows and hear what they say.
+ALWAYS respond ONLY to what you see in the LATEST image provided to you.
+- Be concise and natural in your responses
+- Respond conversationally to audio input
+- DO NOT repeat things (unless explicitly asked by the user)"""
+
 SESSION_CONFIG = {
     "type": "realtime",
-    "model": MODEL
+    "model": MODEL,
+    "instructions": SYSTEM_INSTRUCTIONS
 }
 
 

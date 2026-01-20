@@ -87,11 +87,12 @@ VAD_PREFIX_PADDING_MS = int(os.environ.get("OPENAI_SERVER_SIDE_VAD_PREFIX_PADDIN
 VAD_SILENCE_DURATION_MS = int(os.environ.get("OPENAI_SERVER_SIDE_VAD_SILENCE_DURATION_MS", 500))
 
 # System instructions for the AI
-SYSTEM_INSTRUCTIONS = """You are a helpful AI assistant with vision capabilities. 
+SYSTEM_INSTRUCTIONS = """You are a helpful AI assistant with vision capabilities.
 You can see what the user's camera shows and hear what they say.
-Respond naturally and conversationally to what you see and hear.
-Be concise but helpful. Describe what you see when asked.
-If you notice something interesting or relevant, feel free to mention it."""
+ALWAYS respond ONLY to what you see in the LATEST image provided to you.
+- Be concise and natural in your responses
+- Respond conversationally to audio input
+- DO NOT repeat things (unless explicitly asked by the user)"""
 
 
 class RealtimeVisionClient:
@@ -114,6 +115,7 @@ class RealtimeVisionClient:
         self.is_responding = False  # Track when AI is streaming a response
         self.is_user_speaking = False  # Track when user is speaking (for frame rate switching)
         self.frame_interval_event = asyncio.Event()  # Signal to update frame interval
+        self.immediate_frame_requested = False  # Flag to request immediate frame capture on interruption
 
     async def connect(self):
         """Connect to OpenAI Realtime API via WebSocket."""
@@ -288,6 +290,13 @@ class RealtimeVisionClient:
                 
                 await self.out_queue.put(encoded_data)
                 
+                # Check for immediate frame request (on interruption)
+                # If set, clear it and skip sleep to send next frame immediately
+                if self.immediate_frame_requested:
+                    self.immediate_frame_requested = False
+                    log_event("📷", f"{Colors.CYAN}Immediate frame sent (interruption){Colors.RESET}")
+                    continue  # Skip sleep, send another frame right away
+                
                 # Use interruptible sleep with current interval
                 await self._interruptible_sleep(self._get_current_frame_interval())
         finally:
@@ -333,6 +342,12 @@ class RealtimeVisionClient:
                 continue
             
             await self.out_queue.put(frame)
+            
+            # Check for immediate frame request (on interruption)
+            if self.immediate_frame_requested:
+                self.immediate_frame_requested = False
+                log_event("📷", f"{Colors.CYAN}Immediate frame sent (interruption){Colors.RESET}")
+                continue  # Skip sleep, send another frame right away
             
             # Use interruptible sleep with current interval
             await self._interruptible_sleep(self._get_current_frame_interval())
@@ -447,6 +462,9 @@ class RealtimeVisionClient:
                             self.audio_in_queue.get_nowait()
                         except asyncio.QueueEmpty:
                             break
+                    # CRITICAL: Request immediate frame capture so model has latest visual context
+                    # This prevents the "stale frame" issue where model responds to old images
+                    self.immediate_frame_requested = True
                     
                 elif event_type == "input_audio_buffer.speech_stopped":
                     log_event("🎤", f"{Colors.DIM}Processing...{Colors.RESET}")

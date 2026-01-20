@@ -474,6 +474,9 @@ class RealtimeClient {
                 console.log('🎤 Listening...');
                 // Switch to fast frame capture mode
                 this.switchFrameMode(true);
+                // CRITICAL: Send current frame immediately so model has latest visual context
+                // This prevents the "stale frame" issue where model responds to old images
+                this.captureAndSendFrame();
                 break;
                 
             case 'input_audio_buffer.speech_stopped':
