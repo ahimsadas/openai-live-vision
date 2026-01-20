@@ -18,23 +18,26 @@ A browser-based client using WebRTC for real-time audio/video streaming with Ope
 
 ## Setup
 
-1. Create and activate virtual environment:
-   ```bash
-   cd web
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+### 1. Configure Environment
 
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+cp .env.example .env
+# Edit .env and add your OPENAI_API_KEY
+```
 
-3. Create `.env` file with your API key:
-   ```bash
-   cp ../.env.example ../.env
-   # Edit .env and add your OPENAI_API_KEY
-   ```
+### 2. Create Virtual Environment
+
+```bash
+cd web
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
 
 ## Usage
 
