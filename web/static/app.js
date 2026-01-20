@@ -35,6 +35,7 @@ class RealtimeClient {
         this.btnSwitch = document.getElementById('btnSwitch');
         this.btnDebug = document.getElementById('btnDebug');
         this.debugCanvas = document.getElementById('debugCanvas');
+        this.warmupOverlay = document.getElementById('warmupOverlay');
         this.statusDot = document.getElementById('statusDot');
         this.statusText = document.getElementById('statusText');
         this.transcriptContent = document.getElementById('transcriptContent');
@@ -100,7 +101,9 @@ class RealtimeClient {
     
     async connect() {
         try {
-            this.showStatus('Connecting...', false);
+            // Show warmup immediately when user taps call
+            this.warmupOverlay.classList.remove('hidden');
+            this.showStatus('Warming up...', false);
             this.hideError();
             
             // Get user media (camera + microphone)
@@ -153,8 +156,17 @@ class RealtimeClient {
             
             // Set up data channel for events
             this.dc = this.pc.createDataChannel('oai-events');
-            this.dc.onopen = () => {
+            this.dc.onopen = async () => {
                 console.log('Data channel opened');
+                
+                // Model warmup: 5 seconds AFTER connection to let model stabilize
+                console.log('[Client] Connection established, starting 5s model warmup...');
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                
+                this.warmupOverlay.classList.add('hidden');
+                console.log('[Client] Warmup complete, enabling video');
+                this.showStatus('Connected', true);
+                
                 this.startSendingFrames();
             };
             this.dc.onmessage = (e) => this.handleServerEvent(JSON.parse(e.data));

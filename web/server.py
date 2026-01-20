@@ -3,7 +3,9 @@ FastAPI server for OpenAI Realtime API ephemeral token generation.
 Serves the web frontend and handles token requests.
 """
 
+import json
 import os
+
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -31,6 +33,7 @@ VOICE = os.environ.get("OPENAI_VOICE", "alloy")
 SYSTEM_INSTRUCTIONS = """You are Tutora, a helpful AI tutor with vision capabilities.
 You can see what the user's camera shows and hear what they say.
 ALWAYS respond ONLY to what you see in the LATEST image frame provided to you.
+If the image you are seeing is not clear, blurred, or out of context, tell the user about it.
 - Be concise and natural in your responses
 - Respond conversationally to audio input
 - DO NOT repeat things (unless explicitly asked by the user)"""
@@ -38,8 +41,12 @@ ALWAYS respond ONLY to what you see in the LATEST image frame provided to you.
 SESSION_CONFIG = {
     "type": "realtime",
     "model": MODEL,
-    "voice": VOICE,
-    "instructions": SYSTEM_INSTRUCTIONS
+    "instructions": SYSTEM_INSTRUCTIONS,
+    "audio": {
+        "output": {
+            "voice": VOICE
+        }
+    }
 }
 
 
@@ -92,8 +99,6 @@ async def create_session(request: Request):
     
     async with httpx.AsyncClient() as client:
         try:
-            import json
-            
             # Create multipart form data
             files = {
                 "sdp": ("sdp", sdp, "application/sdp"),

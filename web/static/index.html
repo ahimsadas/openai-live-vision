@@ -55,7 +55,6 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scaleX(-1);
         }
 
         .video-overlay {
@@ -186,6 +185,40 @@
             display: block;
         }
 
+        .warmup-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            z-index: 10;
+        }
+
+        .warmup-overlay.hidden {
+            display: none;
+        }
+
+        .warmup-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-top-color: #00c853;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .warmup-text {
+            font-size: 1.1rem;
+            color: #fff;
+            font-weight: 500;
+        }
+
         .transcript {
             background: rgba(255, 255, 255, 0.05);
             border-radius: 12px;
@@ -285,6 +318,10 @@
         <div class="video-container">
             <video id="localVideo" autoplay playsinline muted></video>
             <canvas id="debugCanvas"></canvas>
+            <div id="warmupOverlay" class="warmup-overlay hidden">
+                <div class="warmup-spinner"></div>
+                <div class="warmup-text">Warming up…</div>
+            </div>
             <div class="video-overlay">
                 <div class="status-badge">
                     <div class="status-dot" id="statusDot"></div>
