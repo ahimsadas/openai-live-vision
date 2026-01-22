@@ -30,6 +30,10 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 MODEL = os.environ.get("OPENAI_MODEL", "gpt-realtime")
 VOICE = os.environ.get("OPENAI_VOICE", "alloy")
 
+# Frame capture intervals (from .env or defaults)
+IDLE_FRAME_INTERVAL_MS = int(os.environ.get("IDLE_FRAME_INTERVAL_MS", 6000))
+SPEAK_FRAME_INTERVAL_MS = int(os.environ.get("SPEAK_FRAME_INTERVAL_MS", 500))
+
 SYSTEM_INSTRUCTIONS = """You are Tutora, a helpful AI tutor with vision capabilities.
 You can see what the user's camera shows and hear what they say.
 ALWAYS respond ONLY to what you see in the LATEST image frame provided to you.
@@ -48,6 +52,24 @@ SESSION_CONFIG = {
         }
     }
 }
+
+
+@app.get("/config")
+async def get_config():
+    """Return configuration info for the client including frame intervals."""
+    if not OPENAI_API_KEY:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "OPENAI_API_KEY not configured"}
+        )
+    return {
+        "status": "ok",
+        "model": MODEL,
+        "frame_intervals": {
+            "idle_ms": IDLE_FRAME_INTERVAL_MS,
+            "speak_ms": SPEAK_FRAME_INTERVAL_MS
+        }
+    }
 
 
 @app.get("/token")

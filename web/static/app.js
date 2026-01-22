@@ -3,9 +3,9 @@
  * Connects to OpenAI Realtime API via WebRTC with camera and microphone
  */
 
-// Frame capture intervals (configurable)
-const IDLE_FRAME_INTERVAL_MS = 6000;   // 1 frame every 6 seconds when idle
-const SPEAK_FRAME_INTERVAL_MS = 500;   // 2 frames per second when user speaking
+// Frame capture intervals - will be loaded from server /config endpoint
+let IDLE_FRAME_INTERVAL_MS = 10000;   // 1 frame every 10 seconds when idle
+let SPEAK_FRAME_INTERVAL_MS = 1000;   // 1 frame every second when user speaking
 
 class RealtimeClient {
     constructor() {
@@ -124,6 +124,22 @@ class RealtimeClient {
             
             this.videoEl.srcObject = this.localStream;
             this.scheduleVideoAspectUpdate(this.localStream.getVideoTracks()[0]);
+            
+            // Get config from server (includes frame intervals)
+            this.showStatus('Getting config...', false);
+            const configResponse = await fetch('/config');
+            const configData = await configResponse.json();
+            
+            if (configData.error) {
+                throw new Error(configData.error);
+            }
+            
+            // Apply frame interval settings from server
+            if (configData.frame_intervals) {
+                IDLE_FRAME_INTERVAL_MS = configData.frame_intervals.idle_ms;
+                SPEAK_FRAME_INTERVAL_MS = configData.frame_intervals.speak_ms;
+                console.log(`[Client] Frame intervals: idle=${IDLE_FRAME_INTERVAL_MS}ms, speak=${SPEAK_FRAME_INTERVAL_MS}ms`);
+            }
             
             // Get ephemeral token from our server
             this.showStatus('Getting token...', false);
