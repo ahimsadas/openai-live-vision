@@ -469,12 +469,6 @@ class RealtimeClient {
                 this.addTranscript('system', 'Session updated');
                 break;
                 
-            case 'conversation.item.input_audio_transcription.completed':
-                if (event.transcript) {
-                    this.addTranscript('user', event.transcript);
-                }
-                break;
-                
             case 'input_audio_buffer.speech_started':
                 // Interruption: user started speaking
                 if (this.isResponding) {
